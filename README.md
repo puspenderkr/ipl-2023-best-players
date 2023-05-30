@@ -1,6 +1,4 @@
 # ipl-2023-best-players and their stats
-A rating system for IPL players who played in 2023, along with data scrapped from howstat
-
 Cricket is one of my favorite sports(although I can’t play it to save my life). And since IPL 2023 has come to an end, I am sure millions of cricket fans would be interested in knowing which player was best this season.
 
 For this article, I will only be carrying out only two tasks —
@@ -32,7 +30,7 @@ For the URL, I go to HowStat Website and decide to first take the data of the pl
 Hence, the website URL is http://www.howstat.com/cricket/Statistics/IPL/PlayerList.asp. Go to this website link and press Ctrl+Shift+J to Inspect the HTML Code. Through this, you can understand the location of the needed data in the HTML code. This is important as we will scrap through HTML code. Next, since we only need data of the players that played in IPL 2023 we need to select the Season from the dropdown list.
 
 
-![Image description](https://dev-to-uploads.s3.amazonaws.com/uploads/articles/ivvscsv0nige0jh8qsxi.png)
+![Overview of the Table](https://dev-to-uploads.s3.amazonaws.com/uploads/articles/ivvscsv0nige0jh8qsxi.png)
 
 We will use the Select class from Selenium to interact with a drop-down list on the web page. It selects the 17th option (index 16) in the drop-down list. Here's the code for it -
 
@@ -51,89 +49,49 @@ Now we need to extract each player data individually, to do so we can get all th
 For this, we need to see the table in HTML code and find the content of class attribute so that our code can find it uniquely.
 
 
-![Image description](https://dev-to-uploads.s3.amazonaws.com/uploads/articles/nutiofjg3cx6o1hfz6nl.png)
+![Each Rows and Column Overview](https://dev-to-uploads.s3.amazonaws.com/uploads/articles/nutiofjg3cx6o1hfz6nl.png)
 
-table.tablelined in the above picture shows that for the table tag we have class attribute value as TableLined. Now, we need to access the individual cell containing the name and link to the player profile page, of this Table present in table variable.
+table.tablelined in the above picture shows that for the table tag we have class attribute value as TableLined. Now, we need to access the individual cell containing the name and stats of the players
 
 The code would be -
 
 ```
 table = soup.find("table",{"class":"TableLined"})
-a = table.find_all("a", {"class":"LinkTable"})
+trs = table.find_all("tr")
 ```
 
-After getting all the players <a> tag we need to extract the link to their profile page.  We will iterate over each anchor tag and extracts the href attribute (link) and text (name) within the tag. The extracted names are added to the names list, and the extracted links are added to the player_links list.
+After finding the table element using soup.find("table", {"class": "TableLined"}) and extracting all the rows from the table. Now we iterate over each row using a for loop. Within each row, we find the individual cells that contain player stats. Within each row, we find all <td> tags (table cells) using find_all("td"). The data from each cell is extracted and stripped of leading/trailing whitespace using text.strip(), and assigned to variables such as name, match, run, bat_avg, wicket, and bow_avg
+
+Here's the code -
 
 ```
-player_links = []
-names = []
-
-for i in a:
-    link = i.get("href")
-    name = i.text
-    names.append(name)
-    player_links.append(link)
-```
-
-After storing all the links in player_links list we will now visit each link and extract player stats. First we will initialize an empty list called datas to store the extracted data.
-
-
-![Image description](https://dev-to-uploads.s3.amazonaws.com/uploads/articles/wcrl5yaxt4nwrbrtt5tz.png)
-
-The batting and bowling stats are stored in an HTML table with class name 'desktop'. We will use this attribute to scrap our desired data.
-
-We will create a for loop that iterates over a range of numbers starting from 0 up to the length of the player_links list. The loop variable x is used to access elements from player_links. Then we search for a table element with the class "desktop" using soup.find("table",{"class":"desktop"}) and assigns it to the variable table. Then we proceed to find all the table rows (<tr>) within the table using table.find_all("tr") and stores them in the variable trs.
-
-The code looks like this -
-
-```
-datas = []
-for x in range(641,len(player_links)):
-        
-    url = "http://www.howstat.com/cricket/Statistics/IPL/" + str(player_links[x])
+player_stat = defaultdict(def_value)
+for i in range(1, len(trs)):
+    tds = trs[i].find_all("td")
+    name = tds[0].text.strip()
+    match = tds[2].text.strip()
+    run = tds[3].text.strip()
+    bat_avg = tds[4].text.strip()
+    wicket = tds[5].text.strip()
+    bow_avg = tds[6].text.strip()
     
-    driver = webdriver.Chrome()
-    driver.get(url)
-
-    content = driver.page_source.encode('utf-8').strip()
-    soup = BeautifulSoup(content,"html.parser")
+    player_stat = {"Name": name, "Matches": match, "Runs": run, 
+    "Batting Average": bat_avg, "Wicket": wicket, "Bowling 
+    Average": bow_avg}
     
-    table = soup.find("table",{"class":"desktop"})
-    trs = table.find_all("tr")
-```
-A defaultdict named player_stat is created using the defaultdict class from the collections module. The def_value() function is passed as an argument, so if a key is accessed that doesn't exist in the dictionary, it will return "Not Present" instead of raising a KeyError. The initial value for the "name" key is set to names[x].
-
-Now iterate over each table row in trs. Inside the loop, the code finds all the table data cells (<td>) within the row using i.find_all("td") and assigns them to tds.
-
-Since we do not require some of the empty rows and rows containing names such as batting, bowling, etc. So an if statement checks if the number of cells in tds is less than 2. If it is, the loop jumps to the next iteration, skipping the current row.
+    data.append(player_stat)
 
 ```
-    from collections import defaultdict
-    
-    def def_value():
-        return "Not Present"
-    
-    player_stat = defaultdict(def_value)
-    player_stat["name"] = names[x]
-    
-    for i in trs:
-        tds = i.find_all("td")
-        if len(tds) < 2:
-            continue
-        player_stat[tds[0].text.strip().lower().rstrip(":")] = tds[1].text.strip()
-        
-    datas.append(player_stat)
-    driver.quit()
-```
-The code takes the first cell (tds[0]), extracts its text content using .text.strip(), converts it to lowercase, and removes any trailing ":" characters using .rstrip(":"). This processed text is used as a key in player_stat, and the value of the second cell (tds[1]) is extracted using .text.strip(). The key-value pair is added to player_stat.
 
-After iterating over all the rows, player_stat contains the extracted data for the current player. It is appended to the datas list. The driver.quit() method is called to close the WebDriver and free system resources.
 
-And so the loop continues for each player.
+Then, a dictionary named player_stat is created with the extracted data, using keys such as "Name", "Matches", "Runs", "Batting Average", "Wicket", and "Bowling Average". This dictionary represents the statistics of a single player.
 
-Now the data is saved as csv file.
+The player_stat dictionary is then appended to the data list (which has been initialized earlier in the code) to store the statistics for all players.
 
-The complete code is available on my [github ](https://github.com/puspenderkr/ipl-2023-best-players)and the csv is file available on my [kaggle](https://www.kaggle.com/datasets/puspenderkry/ipl-player-stats-2008-2023).
+Now the data is saved as a CSV file.
 
-In Part 2, I will solve the second problem i.e Finding the best players of the season.
+The complete code is available on my [GitHub ](https://github.com/puspenderkr/ipl-2023-best-players)and the csv is file available on my [Kaggle](https://www.kaggle.com/datasets/puspenderkry/ipl-2023-player-stats).
+
+In Part 2, I will solve the second problem i.e. Finding the best players of the season.
+
 
